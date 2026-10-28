@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer Glass Vial Silhouette -->
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M50,26 L58,26 C59.1,26 60,26.9 60,28 L60,36 L68.5,52 C71.2,56.8 69.4,63 64.5,65.8 C62.5,66.9 60.3,67.5 58,67.5 L50,67.5 C43.1,67.5 37.5,61.9 37.5,55 C37.5,53.2 38,51.4 38.9,49.8 L48,36 L48,28 C48,26.9 48.9,26 50,26 Z" />
+    <!-- Liquid Core -->
+    <path
+        android:fillColor="#FF2E93"
+        android:pathData="M42,52 C45,50 49,54 54,52 C59,50 63,54 66,53 L66,57 C65.5,62.5 61,66 54,66 C47,66 42.5,62.5 42,57 Z" />
+    <!-- Glowing Specular Highlight & Glass Sparkle -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M48,32 L51,32 C51.6,32 52,32.4 52,33 L52,40 L46,49 C45.4,50 44,49.6 44,48.5 L47.5,34 C47.7,33.2 48.3,32 48,32 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M68,30 L70,32 L68,34 L66,32 Z" />
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M38,62 L39.5,63.5 L38,65 L36.5,63.5 Z" />
+</vector>

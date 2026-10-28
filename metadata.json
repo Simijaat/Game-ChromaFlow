@@ -1,0 +1,6 @@
+{
+  "name": "ChromaFlow",
+  "description": "ChromaFlow: Liquid Jam - 2D Spatial Buffer & Fluid Merge Puzzle Game with Authentic Liquid Glass UI",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
