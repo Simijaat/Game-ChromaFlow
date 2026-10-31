@@ -195,13 +195,83 @@
       display: flex;
       align-items: center;
       gap: 4px;
-      padding: 4px 10px;
+      padding: 4px 8px;
       background: linear-gradient(90deg, rgba(255, 119, 0, 0.35), rgba(255, 46, 147, 0.35));
       border-radius: var(--gr-radius-pill);
       font-weight: 800;
-      font-size: 12px;
+      font-size: 11px;
       color: #FFD700;
       border: 1px solid rgba(255, 165, 0, 0.5);
+    }
+
+    .daily-streak-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 9px;
+      background: linear-gradient(135deg, rgba(255, 215, 0, 0.28), rgba(255, 120, 0, 0.38));
+      border: 1px solid rgba(255, 215, 0, 0.65);
+      border-radius: var(--gr-radius-pill);
+      font-weight: 800;
+      font-size: 11px;
+      color: #FFE66D;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+    .daily-streak-badge:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 12px rgba(255, 215, 0, 0.5);
+    }
+    .daily-streak-badge:active {
+      transform: scale(0.96);
+    }
+    .unclaimed-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #00FF88;
+      box-shadow: 0 0 8px #00FF88;
+      display: inline-block;
+      animation: pulse-glow 1.5s infinite;
+    }
+    @keyframes pulse-glow {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.35); opacity: 0.65; }
+    }
+    .daily-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+      gap: 8px;
+      width: 100%;
+      margin: 10px 0;
+    }
+    .daily-day-card {
+      border-radius: 12px;
+      padding: 8px 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      transition: all 0.25s ease;
+    }
+    .daily-day-card.claimed {
+      background: rgba(0, 230, 118, 0.12);
+      border-color: rgba(0, 230, 118, 0.45);
+      opacity: 0.8;
+    }
+    .daily-day-card.active-today {
+      background: linear-gradient(135deg, rgba(255, 215, 0, 0.28), rgba(255, 120, 0, 0.32));
+      border-color: #FFD700;
+      box-shadow: 0 0 14px rgba(255, 215, 0, 0.45);
+      transform: translateY(-2px);
+    }
+    .daily-day-card.locked {
+      opacity: 0.5;
     }
 
     .resource-chip {
@@ -730,9 +800,14 @@
         <div class="hud-left">
           <div class="level-badge" id="level-badge">LVL 1</div>
           <button class="liquid-glass-btn" id="btn-boss-jump" style="padding: 4px 8px; font-size: 11px; background: rgba(255, 215, 0, 0.22); border-color: rgba(255, 215, 0, 0.6);" title="Jump to Alchemist Boss Order (Every 5th Level)">👑 Boss</button>
-          <div class="streak-pill" id="streak-badge">
+          <div class="streak-pill" id="streak-badge" title="Combo Streak">
             <span>🔥</span>
             <span id="streak-text">x1</span>
+          </div>
+          <div class="daily-streak-badge" id="btn-daily-streak-hud" title="Daily Streak Bonus Multiplier (Tap to view rewards)">
+            <span id="daily-streak-hud-icon">📅</span>
+            <span id="daily-streak-hud-text">Day 1 (1.2x)</span>
+            <span class="unclaimed-dot" id="daily-unclaimed-indicator"></span>
           </div>
         </div>
 
@@ -992,6 +1067,37 @@
         <div id="prism-pass-list" style="width:100%; display:flex; flex-direction:column; gap:8px; margin-bottom:10px;"></div>
 
         <button class="liquid-glass-btn" id="btn-close-pass" style="width: 100%; margin-top: 6px;">
+          Back to Puzzle
+        </button>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="daily-streak-modal">
+      <div class="modal-content liquid-glass-panel interactive" style="max-height: 88vh; overflow-y: auto; width: min(94vw, 420px);">
+        <div class="modal-title" style="display:flex; align-items:center; justify-content:space-between; width:100%;">
+          <span>📅 DAILY STREAK BONUS</span>
+          <span class="resource-chip" style="font-size:12px; padding:3px 9px;">
+            <span>🪙</span>
+            <span id="daily-modal-coins">150</span>
+          </span>
+        </div>
+        <div style="font-size:12px; color:rgba(255,255,255,0.8); margin-top:-6px; text-align:center;">
+          Login daily to unlock increasing coin multipliers up to 3.0x!
+        </div>
+
+        <div style="width:100%; background:linear-gradient(135deg, rgba(255,215,0,0.18), rgba(255,119,0,0.18)); border:1px solid rgba(255,215,0,0.5); border-radius:14px; padding:12px; margin:10px 0; text-align:center;">
+          <div style="font-size:11px; font-weight:800; color:#FFD700; text-transform:uppercase; letter-spacing:0.8px;">Active Multiplier Status</div>
+          <div style="font-size:24px; font-weight:900; color:#FFE66D; margin:4px 0;" id="daily-active-mult-banner">1.2x COIN MULTIPLIER</div>
+          <div style="font-size:11px; color:white; opacity:0.9;" id="daily-streak-status-banner">Current Streak: Day 1 / 7</div>
+        </div>
+
+        <div class="daily-cards-grid" id="daily-cards-container"></div>
+
+        <button class="liquid-glass-btn" id="btn-claim-daily-action" style="width:100%; padding:12px; font-size:14px; font-weight:900; background:linear-gradient(135deg, #FFD700, #FF7700); color:#000; box-shadow:0 0 16px rgba(255,215,0,0.4); margin-top:6px;">
+          Claim Today's Bonus!
+        </button>
+
+        <button class="liquid-glass-btn" id="btn-close-daily-modal" style="width: 100%; margin-top: 8px;">
           Back to Puzzle
         </button>
       </div>
@@ -1645,12 +1751,31 @@
 
     const soundEngine = new SoundEngine();
 
+    const DAILY_STREAK_SCHEDULE = [
+      { day: 1, mult: 1.2, coins: 100, shards: 0, title: "Alchemist Starter" },
+      { day: 2, mult: 1.4, coins: 150, shards: 0, title: "Prism Initiate" },
+      { day: 3, mult: 1.6, coins: 200, shards: 0, title: "Liquid Adept" },
+      { day: 4, mult: 1.8, coins: 250, shards: 5, title: "Aether Weaver" },
+      { day: 5, mult: 2.0, coins: 350, shards: 10, title: "Vial Master" },
+      { day: 6, mult: 2.5, coins: 500, shards: 15, title: "Prism Sovereign" },
+      { day: 7, mult: 3.0, coins: 1000, shards: 30, title: "Grand Grandmaster" }
+    ];
+
+    function getDailyStreakMultiplier(day) {
+      const match = DAILY_STREAK_SCHEDULE.find(s => s.day === day);
+      return match ? match.mult : 1.2;
+    }
+
     const state = {
       levelNum: 1,
       coins: 150,
       shards: 10,
       streak: 0,
       maxStreak: 0,
+      dailyStreak: 1,
+      lastDailyLoginDate: '',
+      dailyClaimedToday: false,
+      dailyMultiplier: 1.2,
       currentTheme: 'crystal',
       bufferCapacity: 5,
       upgrades: {
@@ -1746,6 +1871,9 @@
           if (data.levelNum) state.levelNum = data.levelNum;
           if (data.coins !== undefined) state.coins = data.coins;
           if (data.shards !== undefined) state.shards = data.shards;
+          if (data.dailyStreak) state.dailyStreak = data.dailyStreak;
+          if (data.lastDailyLoginDate) state.lastDailyLoginDate = data.lastDailyLoginDate;
+          if (data.dailyClaimedToday !== undefined) state.dailyClaimedToday = data.dailyClaimedToday;
           if (data.upgrades) Object.assign(state.upgrades, data.upgrades);
           if (data.boosters) Object.assign(state.boosters, data.boosters);
           if (data.currentTheme) state.currentTheme = data.currentTheme;
@@ -1770,6 +1898,9 @@
           levelNum: state.levelNum,
           coins: state.coins,
           shards: state.shards,
+          dailyStreak: state.dailyStreak,
+          lastDailyLoginDate: state.lastDailyLoginDate,
+          dailyClaimedToday: state.dailyClaimedToday,
           upgrades: state.upgrades,
           boosters: state.boosters,
           currentTheme: state.currentTheme,
@@ -1805,6 +1936,7 @@
     const themesModal = document.getElementById('themes-modal');
     const passModal = document.getElementById('pass-modal');
     const movesModal = document.getElementById('moves-modal');
+    const dailyStreakModal = document.getElementById('daily-streak-modal');
 
     const bgOrbs = [
       { x: 0.2, y: 0.25, r: 140, vx: 0.015, vy: 0.018, color: 'rgba(0, 229, 255, 0.28)' },
@@ -2211,12 +2343,14 @@
         state.prismPassXP += 25;
 
         const baseReward = vial.isGiantPrism ? 75 : 25;
-        const earnedCoins = (baseReward + state.streak * 5) * state.upgrades.coinMultiplier;
-        state.coins += Math.floor(earnedCoins);
+        const totalMult = (state.upgrades.coinMultiplier || 1) * (state.dailyMultiplier || 1.0);
+        const earnedCoins = Math.round((baseReward + state.streak * 5) * totalMult);
+        state.coins += earnedCoins;
         saveGameData();
 
         spawnRainbowParticles(Math.floor(viewWidth / 2), 100);
-        showFloatingText(vial.isGiantPrism ? `BOSS FLASK COMPLETE! +${earnedCoins}` : `+${earnedCoins} COINS!`, Math.floor(viewWidth / 2), 120, '#FFD700');
+        const multLabel = state.dailyMultiplier > 1.0 ? ` (${state.dailyMultiplier.toFixed(1)}x Daily)` : '';
+        showFloatingText(vial.isGiantPrism ? `BOSS FLASK COMPLETE! +${earnedCoins}${multLabel}` : `+${earnedCoins} COINS!${multLabel}`, Math.floor(viewWidth / 2), 120, '#FFD700');
 
         setTimeout(() => {
           renderVialsHUD();
@@ -2367,11 +2501,14 @@
         renderVialsHUD();
         state.isLevelWon = true;
         soundEngine.playVictory();
-        state.coins += state.levelData.rewardCoins;
+        const winMult = (state.upgrades.coinMultiplier || 1) * (state.dailyMultiplier || 1.0);
+        const winCoins = Math.round(state.levelData.rewardCoins * winMult);
+        state.coins += winCoins;
         state.shards += state.levelData.rewardShards;
         saveGameData();
 
-        document.getElementById('win-coins-text').textContent = `+${state.levelData.rewardCoins} Coins`;
+        const multNote = state.dailyMultiplier > 1.0 ? ` (${state.dailyMultiplier.toFixed(1)}x Daily Bonus!)` : '';
+        document.getElementById('win-coins-text').textContent = `+${winCoins} Coins${multNote}`;
         document.getElementById('win-shards-text').textContent = `+${state.levelData.rewardShards} Shards`;
         setTimeout(() => victoryModal.classList.add('open'), 400);
       }
@@ -3276,6 +3413,7 @@
       themesModal.classList.remove('open');
       if (passModal) passModal.classList.remove('open');
       if (movesModal) movesModal.classList.remove('open');
+      if (dailyStreakModal) dailyStreakModal.classList.remove('open');
     }
 
     function openTab(tabName) {
@@ -3323,6 +3461,118 @@
       } else {
         soundEngine.playBlocked();
       }
+    }
+
+
+    function checkDailyStreakLogin() {
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+      if (!state.lastDailyLoginDate) {
+        state.dailyStreak = 1;
+        state.lastDailyLoginDate = todayStr;
+        state.dailyClaimedToday = false;
+      } else if (state.lastDailyLoginDate === todayStr) {
+        // Same day: preserve streak and claimed status
+      } else {
+        const lastDate = new Date(state.lastDailyLoginDate + 'T00:00:00');
+        const currDate = new Date(todayStr + 'T00:00:00');
+        const diffDays = Math.round((currDate.getTime() - lastDate.getTime()) / (1000 * 3600 * 24));
+        if (diffDays === 1) {
+          state.dailyStreak = state.dailyStreak >= 7 ? 7 : state.dailyStreak + 1;
+          state.dailyClaimedToday = false;
+        } else if (diffDays > 1) {
+          state.dailyStreak = 1;
+          state.dailyClaimedToday = false;
+        }
+        state.lastDailyLoginDate = todayStr;
+      }
+      state.dailyMultiplier = getDailyStreakMultiplier(state.dailyStreak);
+      updateDailyStreakHUD();
+      saveGameData();
+    }
+
+    function updateDailyStreakHUD() {
+      const hudText = document.getElementById('daily-streak-hud-text');
+      const dot = document.getElementById('daily-unclaimed-indicator');
+      const icon = document.getElementById('daily-streak-hud-icon');
+      if (hudText) {
+        hudText.textContent = `Day ${state.dailyStreak} (${state.dailyMultiplier.toFixed(1)}x)`;
+      }
+      if (dot) {
+        dot.style.display = state.dailyClaimedToday ? 'none' : 'inline-block';
+      }
+      if (icon) {
+        icon.textContent = state.dailyClaimedToday ? '📅' : '✨';
+      }
+    }
+
+    function renderDailyStreakModal() {
+      const bannerMult = document.getElementById('daily-active-mult-banner');
+      const bannerStatus = document.getElementById('daily-streak-status-banner');
+      const coinsAvail = document.getElementById('daily-modal-coins');
+      const container = document.getElementById('daily-cards-container');
+      const claimBtn = document.getElementById('btn-claim-daily-action');
+
+      if (bannerMult) bannerMult.textContent = `${state.dailyMultiplier.toFixed(1)}x COIN MULTIPLIER`;
+      if (bannerStatus) bannerStatus.textContent = `Consecutive Streak: Day ${state.dailyStreak} of 7 • Multiplies all level coins!`;
+      if (coinsAvail) coinsAvail.textContent = `${state.coins}`;
+
+      if (container) {
+        container.innerHTML = '';
+        DAILY_STREAK_REWARDS.forEach(r => {
+          const isPast = r.day < state.dailyStreak || (r.day === state.dailyStreak && state.dailyClaimedToday);
+          const isToday = r.day === state.dailyStreak;
+          const isLocked = r.day > state.dailyStreak;
+
+          const card = document.createElement('div');
+          card.className = `daily-day-card ${isPast ? 'claimed' : ''} ${isToday && !state.dailyClaimedToday ? 'active-today' : ''} ${isLocked ? 'locked' : ''}`;
+          
+          let statusBadge = isPast ? '<span style="color:#00FF88; font-weight:800; font-size:10px;">✓ Claimed</span>' :
+                            (isToday ? (state.dailyClaimedToday ? '<span style="color:#00FF88; font-weight:800; font-size:10px;">✓ Active</span>' : '<span style="color:#FFD700; font-weight:900; font-size:10px;">★ TODAY</span>') :
+                            '<span style="color:rgba(255,255,255,0.45); font-size:10px;">🔒 Day ' + r.day + '</span>');
+
+          card.innerHTML = `
+            <div style="font-size:11px; font-weight:800; color:#FFF;">Day ${r.day}</div>
+            <div style="font-size:14px; font-weight:900; color:#FFE66D; background:rgba(255,215,0,0.18); padding:2px 6px; border-radius:6px; border:1px solid rgba(255,215,0,0.3);">${r.mult.toFixed(1)}x</div>
+            <div style="font-size:10px; color:#FFF; opacity:0.9;">+${r.coins} 🪙</div>
+            ${r.shards > 0 ? `<div style="font-size:10px; color:#00E5FF; font-weight:700;">+${r.shards} 💎</div>` : ''}
+            ${statusBadge}
+          `;
+          container.appendChild(card);
+        });
+      }
+
+      if (claimBtn) {
+        const todayReward = DAILY_STREAK_SCHEDULE.find(s => s.day === state.dailyStreak) || DAILY_STREAK_SCHEDULE[0];
+        if (!state.dailyClaimedToday) {
+          claimBtn.disabled = false;
+          claimBtn.style.opacity = '1';
+          claimBtn.style.background = 'linear-gradient(135deg, #FFD700, #FF7700)';
+          claimBtn.textContent = `Claim Day ${state.dailyStreak} Bonus (+${todayReward.coins} 🪙${todayReward.shards > 0 ? `, +${todayReward.shards} 💎` : ''})!`;
+        } else {
+          claimBtn.disabled = true;
+          claimBtn.style.opacity = '0.65';
+          claimBtn.style.background = 'rgba(255,255,255,0.12)';
+          claimBtn.textContent = `✓ Today's Bonus Claimed (${state.dailyMultiplier.toFixed(1)}x Active)`;
+        }
+      }
+    }
+
+    function claimDailyStreakReward() {
+      if (state.dailyClaimedToday) return;
+      const todayReward = DAILY_STREAK_SCHEDULE.find(s => s.day === state.dailyStreak) || DAILY_STREAK_SCHEDULE[0];
+      state.coins += todayReward.coins;
+      state.shards += todayReward.shards;
+      state.dailyClaimedToday = true;
+      state.dailyMultiplier = todayReward.mult;
+      soundEngine.playVictory();
+      spawnRainbowParticles(Math.floor(viewWidth / 2), Math.floor(viewHeight / 2));
+      showFloatingText(`+${todayReward.coins} COINS & ${todayReward.mult.toFixed(1)}x DAILY BONUS!`, Math.floor(viewWidth / 2), Math.floor(viewHeight / 2), '#FFD700');
+      updateHUDCounters();
+      updateDailyStreakHUD();
+      saveGameData();
+      renderDailyStreakModal();
     }
 
     function bootstrap() {
@@ -3382,6 +3632,27 @@
           openTab('THEMES');
         });
       });
+
+      const btnDailyHud = document.getElementById('btn-daily-streak-hud');
+      if (btnDailyHud) {
+        btnDailyHud.addEventListener('click', () => {
+          renderDailyStreakModal();
+          dailyStreakModal.classList.add('open');
+          soundEngine.playTapGlass(1.1);
+        });
+      }
+
+      const btnClaimDaily = document.getElementById('btn-claim-daily-action');
+      if (btnClaimDaily) {
+        btnClaimDaily.addEventListener('click', claimDailyStreakReward);
+      }
+
+      const btnCloseDaily = document.getElementById('btn-close-daily-modal');
+      if (btnCloseDaily) {
+        btnCloseDaily.addEventListener('click', () => dailyStreakModal.classList.remove('open'));
+      }
+
+      checkDailyStreakLogin();
 
       document.getElementById('btn-sound-toggle').addEventListener('click', () => {
         const on = soundEngine.toggleSound();

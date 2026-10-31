@@ -20,6 +20,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -368,6 +370,28 @@ data class PrismPassTier(
     val title: String
 )
 
+data class DailyStreakReward(
+    val day: Int,
+    val mult: Float,
+    val coins: Int,
+    val shards: Int,
+    val title: String
+)
+
+val DAILY_STREAK_SCHEDULE = listOf(
+    DailyStreakReward(1, 1.2f, 100, 0, "Alchemist Starter"),
+    DailyStreakReward(2, 1.4f, 150, 0, "Prism Initiate"),
+    DailyStreakReward(3, 1.6f, 200, 0, "Liquid Adept"),
+    DailyStreakReward(4, 1.8f, 250, 5, "Aether Weaver"),
+    DailyStreakReward(5, 2.0f, 350, 10, "Vial Master"),
+    DailyStreakReward(6, 2.5f, 500, 15, "Prism Sovereign"),
+    DailyStreakReward(7, 3.0f, 1000, 30, "Grand Grandmaster")
+)
+
+fun getDailyStreakMultiplier(day: Int): Float {
+    return DAILY_STREAK_SCHEDULE.find { it.day == day }?.mult ?: 1.2f
+}
+
 // --- STRICT BACKWARD-CONSTRUCTION SOLVABLE LEVEL GENERATOR ---
 object SolvableLevelBuilder {
     private fun rotateCCW90(dir: ArrowDir, steps: Int): ArrowDir {
@@ -616,6 +640,52 @@ fun ChromaFlowApp(context: Context) {
     var coins by remember { mutableIntStateOf(prefs.getInt("coins", 150)) }
     var shards by remember { mutableIntStateOf(prefs.getInt("shards", 10)) }
     var streak by remember { mutableIntStateOf(0) }
+
+    val todayStr = remember {
+        val cal = java.util.Calendar.getInstance()
+        String.format(java.util.Locale.US, "%04d-%02d-%02d",
+            cal.get(java.util.Calendar.YEAR),
+            cal.get(java.util.Calendar.MONTH) + 1,
+            cal.get(java.util.Calendar.DAY_OF_MONTH)
+        )
+    }
+
+    var dailyStreak by remember { mutableIntStateOf(prefs.getInt("dailyStreak", 1)) }
+    var lastDailyLoginDate by remember { mutableStateOf(prefs.getString("lastDailyLoginDate", "") ?: "") }
+    var dailyClaimedToday by remember { mutableStateOf(prefs.getBoolean("dailyClaimedToday", false)) }
+    var showDailyStreakModal by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        if (lastDailyLoginDate.isEmpty()) {
+            dailyStreak = 1
+            lastDailyLoginDate = todayStr
+            dailyClaimedToday = false
+            prefs.edit().putInt("dailyStreak", 1).putString("lastDailyLoginDate", todayStr).putBoolean("dailyClaimedToday", false).apply()
+        } else if (lastDailyLoginDate != todayStr) {
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+            try {
+                val lastD = sdf.parse(lastDailyLoginDate)
+                val currD = sdf.parse(todayStr)
+                if (lastD != null && currD != null) {
+                    val diffDays = ((currD.time - lastD.time) / (1000 * 60 * 60 * 24)).toInt()
+                    if (diffDays == 1) {
+                        dailyStreak = if (dailyStreak >= 7) 7 else dailyStreak + 1
+                        dailyClaimedToday = false
+                    } else if (diffDays > 1) {
+                        dailyStreak = 1
+                        dailyClaimedToday = false
+                    }
+                }
+            } catch (_: Exception) {
+                dailyStreak = 1
+                dailyClaimedToday = false
+            }
+            lastDailyLoginDate = todayStr
+            prefs.edit().putInt("dailyStreak", dailyStreak).putString("lastDailyLoginDate", todayStr).putBoolean("dailyClaimedToday", dailyClaimedToday).apply()
+        }
+    }
+
+    val dailyMultiplier = getDailyStreakMultiplier(dailyStreak)
     var currentTheme by remember {
         val saved = prefs.getString("theme", "crystal") ?: "crystal"
         mutableStateOf(GlassTheme.entries.find { it.id == saved } ?: GlassTheme.CRYSTAL)
@@ -755,6 +825,9 @@ fun ChromaFlowApp(context: Context) {
             .putBoolean("q_vial_claim", dailyQuests.getOrNull(1)?.claimed ?: false)
             .putInt("q_ext_prog", dailyQuests.getOrNull(2)?.progress ?: 0)
             .putBoolean("q_ext_claim", dailyQuests.getOrNull(2)?.claimed ?: false)
+            .putInt("dailyStreak", dailyStreak)
+            .putString("lastDailyLoginDate", lastDailyLoginDate)
+            .putBoolean("dailyClaimedToday", dailyClaimedToday)
             .apply()
     }
 
@@ -976,7 +1049,9 @@ fun ChromaFlowApp(context: Context) {
             }
             isLevelWon = true
             soundEngine.playVictory()
-            coins += 50 + levelNum * 15 + if (levelNum % 5 == 0) 75 else 0
+            val baseWinCoins = 50 + levelNum * 15 + if (levelNum % 5 == 0) 75 else 0
+            val winCoins = (baseWinCoins * upCoinMult * dailyMultiplier).toInt()
+            coins += winCoins
             shards += if (levelNum % 5 == 0) 6 else 2
             saveState()
         }
@@ -1009,12 +1084,12 @@ fun ChromaFlowApp(context: Context) {
             maxBufferUsedInVial = bufferSlots.size
             prismPassXP += 25
             val baseReward = if (v.isGiantPrism) 75 else 25
-            val bonus = (baseReward + streak * 5) * upCoinMult
+            val bonus = ((baseReward + streak * 5) * upCoinMult * dailyMultiplier).toInt()
             coins += bonus
             saveState()
             spawnChromaticAberrationBurst(boardBounds.center.x, boardBounds.top + 10f, pouredColor.lightHex, 24)
             spawnText(
-                if (v.isGiantPrism) "BOSS FLASK COMPLETE! +$bonus" else "+$bonus COINS!",
+                if (v.isGiantPrism) "BOSS FLASK COMPLETE! +$bonus (${"%.1f".format(dailyMultiplier)}x)" else "+$bonus COINS! (${"%.1f".format(dailyMultiplier)}x)",
                 boardBounds.center.x,
                 boardBounds.top + 40f,
                 Color(0xFFFFD700)
@@ -1301,6 +1376,45 @@ fun ChromaFlowApp(context: Context) {
                                 .padding(horizontal = 7.dp, vertical = 4.dp)
                         ) {
                             Text("🔥 x${streak + 1 + upStreakBonus}", color = Color(0xFFFFD700), fontWeight = FontWeight.ExtraBold, fontSize = 11.sp)
+                        }
+
+                        // Daily Streak Bonus UI Element in Top HUD
+                        Box(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(
+                                    if (!dailyClaimedToday) Brush.horizontalGradient(
+                                        listOf(Color(0xFFFFD700).copy(alpha = 0.35f), Color(0xFFFF7700).copy(alpha = 0.35f))
+                                    ) else SolidColor(Color(0xFFFFD700).copy(alpha = 0.22f))
+                                )
+                                .border(
+                                    1.dp,
+                                    if (!dailyClaimedToday) Color(0xFFFFD700) else Color(0xFFFFD700).copy(alpha = 0.65f),
+                                    CircleShape
+                                )
+                                .clickable {
+                                    showDailyStreakModal = true
+                                    soundEngine.playTapGlass(1.15f)
+                                }
+                                .padding(horizontal = 7.dp, vertical = 4.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(if (!dailyClaimedToday) "✨" else "📅", fontSize = 11.sp)
+                                Text(
+                                    "Day $dailyStreak (${"%.1f".format(dailyMultiplier)}x)",
+                                    color = Color(0xFFFFE66D),
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 10.sp
+                                )
+                                if (!dailyClaimedToday) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF00FF88))
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -2083,11 +2197,13 @@ fun ChromaFlowApp(context: Context) {
             ModalGlassDialog {
                 Text("ALCHEMIST VICTORY!", color = Color(0xFF00E5FF), fontSize = 22.sp, fontWeight = FontWeight.Black)
                 Text("★ ★ ★", color = Color(0xFFFFD700), fontSize = 30.sp, fontWeight = FontWeight.Black)
+                val baseWinCoins = 50 + levelNum * 15 + if (levelNum % 5 == 0) 75 else 0
+                val winCoins = (baseWinCoins * upCoinMult * dailyMultiplier).toInt()
                 Text(
-                    "+${50 + levelNum * 15} Coins   |   +${if (levelNum % 5 == 0) 5 else 2} Shards",
+                    "+$winCoins Coins (${"%.1f".format(dailyMultiplier)}x Daily Bonus!)   |   +${if (levelNum % 5 == 0) 6 else 2} Shards",
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
+                    fontSize = 13.sp
                 )
                 Button(
                     onClick = { loadLevel(levelNum + 1) },
@@ -2442,6 +2558,153 @@ fun ChromaFlowApp(context: Context) {
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Back to Puzzle", color = Color.Black, fontWeight = FontWeight.Black)
+                }
+            }
+        }
+
+        if (showDailyStreakModal) {
+            ModalGlassDialog {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("📅 DAILY STREAK BONUS", color = Color(0xFFFFD700), fontSize = 17.sp, fontWeight = FontWeight.Black)
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.4f))
+                            .border(1.dp, Color.White.copy(alpha = 0.25f), CircleShape)
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text("🪙 $coins", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    }
+                }
+
+                Text(
+                    "Login daily to amplify all level coin rewards up to 3.0x!",
+                    color = Color.White.copy(alpha = 0.85f),
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFFFFD700).copy(alpha = 0.22f), Color(0xFFFF7700).copy(alpha = 0.22f))
+                            )
+                        )
+                        .border(1.dp, Color(0xFFFFD700).copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                        .padding(10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("ACTIVE MULTIPLIER STATUS", color = Color(0xFFFFD700), fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+                        Text("${"%.1f".format(dailyMultiplier)}x COIN MULTIPLIER", color = Color(0xFFFFE66D), fontSize = 20.sp, fontWeight = FontWeight.Black)
+                        Text("Consecutive Login: Day $dailyStreak / 7", color = Color.White.copy(alpha = 0.9f), fontSize = 11.sp)
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 260.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    DAILY_STREAK_SCHEDULE.forEach { r ->
+                        val isPast = r.day < dailyStreak || (r.day == dailyStreak && dailyClaimedToday)
+                        val isToday = r.day == dailyStreak
+                        val isLocked = r.day > dailyStreak
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(
+                                    if (isToday && !dailyClaimedToday) Color(0xFFFFD700).copy(alpha = 0.25f)
+                                    else if (isPast) Color(0xFF00FF88).copy(alpha = 0.12f)
+                                    else Color.White.copy(alpha = 0.06f)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isToday && !dailyClaimedToday) Color(0xFFFFD700)
+                                    else if (isPast) Color(0xFF00FF88).copy(alpha = 0.4f)
+                                    else Color.White.copy(alpha = 0.15f),
+                                    RoundedCornerShape(10.dp)
+                                )
+                                .padding(horizontal = 10.dp, vertical = 7.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("Day ${r.day}: ${r.title}", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text(
+                                    "+${r.coins} 🪙" + if (r.shards > 0) "  +${r.shards} 💎" else "",
+                                    color = Color(0xFFFFD700),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color(0xFFFFD700).copy(alpha = 0.2f))
+                                        .border(1.dp, Color(0xFFFFD700).copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text("${"%.1f".format(r.mult)}x", color = Color(0xFFFFE66D), fontWeight = FontWeight.Black, fontSize = 11.sp)
+                                }
+                                Text(
+                                    if (isPast) "✓ Claimed" else if (isToday) (if (dailyClaimedToday) "✓ Active" else "★ TODAY") else "🔒 Day ${r.day}",
+                                    color = if (isPast) Color(0xFF00FF88) else if (isToday) Color(0xFFFFD700) else Color.White.copy(alpha = 0.4f),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+                    }
+                }
+
+                val todayReward = DAILY_STREAK_SCHEDULE.find { it.day == dailyStreak } ?: DAILY_STREAK_SCHEDULE[0]
+                Button(
+                    onClick = {
+                        if (!dailyClaimedToday) {
+                            coins += todayReward.coins
+                            shards += todayReward.shards
+                            dailyClaimedToday = true
+                            soundEngine.playVictory()
+                            spawnChromaticAberrationBurst(boardBounds.center.x, boardBounds.center.y, Color(0xFFFFD700), 24)
+                            spawnText("+${todayReward.coins} COINS & ${"%.1f".format(todayReward.mult)}x BONUS!", boardBounds.center.x, boardBounds.center.y, Color(0xFFFFD700))
+                            saveState()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !dailyClaimedToday,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFFD700),
+                        disabledContainerColor = Color.White.copy(alpha = 0.15f)
+                    )
+                ) {
+                    Text(
+                        if (!dailyClaimedToday) "Claim Day $dailyStreak Bonus (+${todayReward.coins} 🪙${if (todayReward.shards > 0) ", +${todayReward.shards} 💎" else ""})!"
+                        else "✓ Today's Bonus Claimed (${"%.1f".format(dailyMultiplier)}x Active)",
+                        color = if (!dailyClaimedToday) Color.Black else Color.White.copy(alpha = 0.7f),
+                        fontWeight = FontWeight.Black,
+                        fontSize = 12.sp
+                    )
+                }
+
+                Button(
+                    onClick = { showDailyStreakModal = false },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.18f))
+                ) {
+                    Text("Back to Puzzle", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }
